@@ -1,5 +1,4 @@
-# <CHANGE> Eliminando python-telegram-bot y usando solo requests
 requests==2.31.0
 pytz==2023.3
-APScheduler==3.6.3
+APScheduler==3.10.4
 

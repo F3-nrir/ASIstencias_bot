@@ -1,11 +1,11 @@
 import os
 import logging
-import asyncio
+import threading
 import pytz
 import json
 import time
 from datetime import datetime
-from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from apscheduler.schedulers.blocking import BlockingScheduler
 from apscheduler.triggers.cron import CronTrigger
 import requests
 
@@ -590,31 +590,35 @@ def main():
     bot = TelegramBot(BOT_TOKEN)
     
     # Configurar scheduler
-    scheduler = AsyncIOScheduler(timezone=CUBA_TZ)
+    scheduler = BlockingScheduler(timezone=CUBA_TZ)
     
     # Entrada a las 8:00 AM, lunes a viernes
     scheduler.add_job(
         scheduled_check_in,
-        CronTrigger(hour=8, minute=0, day_of_week='mon-fri'),
+        CronTrigger(hour=8, minute=0, day_of_week='mon-fri', timezone=CUBA_TZ),
         id='check_in'
     )
     
     # Salida a las 5:30 PM, lunes a jueves
     scheduler.add_job(
         scheduled_check_out,
-        CronTrigger(hour=17, minute=30, day_of_week='mon-thu'),
+        CronTrigger(hour=17, minute=30, day_of_week='mon-thu', timezone=CUBA_TZ),
         id='check_out_weekdays'
     )
     
     # Salida a las 4:30 PM, viernes
     scheduler.add_job(
         scheduled_check_out,
-        CronTrigger(hour=16, minute=30, day_of_week='fri'),
+        CronTrigger(hour=16, minute=30, day_of_week='fri', timezone=CUBA_TZ),
         id='check_out_friday'
     )
     
-    scheduler.start()
-    logger.info("Scheduler iniciado")
+    def run_scheduler():
+        scheduler.start()
+    
+    scheduler_thread = threading.Thread(target=run_scheduler, daemon=True)
+    scheduler_thread.start()
+    logger.info("Scheduler iniciado en hilo separado")
     
     logger.info("Bot iniciado")
     
