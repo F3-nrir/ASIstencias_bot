@@ -1,5 +1,4 @@
-# <CHANGE> Cambiando a python-telegram-bot versión 13.15 que es muy estable
-python-telegram-bot==13.15
+python-telegram-bot==12.8
 aiohttp==3.9.1
 pytz==2023.3
 APScheduler==3.6.3
