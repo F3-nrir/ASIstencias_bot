@@ -4,7 +4,7 @@ import asyncio
 import pytz
 from datetime import datetime, time
 from telegram import Update, ReplyKeyboardMarkup, KeyboardButton
-from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
+from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackContext
 import aiohttp
 import json
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -17,7 +17,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-BOT_TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN')
+BOT_TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN', '8402582437:AAE0FFIRVBli09VCm5TpqTtbBvwVeOkqKmE')
 
 # Zona horaria de Cuba
 CUBA_TZ = pytz.timezone('America/Havana')
@@ -277,7 +277,7 @@ class OdooAPI:
             logger.error(f"Error obteniendo asistencia abierta: {e}")
             return None
 
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def start(update: Update, context: CallbackContext):
     """Comando /start"""
     user_id = update.effective_user.id
     
@@ -299,7 +299,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "Usa el comando /config para empezar."
         )
 
-async def config(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def config(update: Update, context: CallbackContext):
     """Iniciar configuración de Odoo"""
     user_id = update.effective_user.id
     user_states[user_id] = "waiting_url"
@@ -310,7 +310,7 @@ async def config(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "Ejemplo: https://mi-odoo.com"
     )
 
-async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def status(update: Update, context: CallbackContext):
     """Ver estado de configuración"""
     user_id = update.effective_user.id
     
@@ -330,7 +330,7 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"📅 Viernes: 8:00 AM - 4:30 PM"
     )
 
-async def test_connection(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def test_connection(update: Update, context: CallbackContext):
     """Probar conexión con Odoo"""
     user_id = update.effective_user.id
     
@@ -355,7 +355,7 @@ async def test_connection(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         await update.message.reply_text("❌ Error de conexión.")
 
-async def manual_in(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def manual_in(update: Update, context: CallbackContext):
     """Marcar entrada manual"""
     user_id = update.effective_user.id
     
@@ -382,7 +382,7 @@ async def manual_in(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         await update.message.reply_text("❌ Error de conexión.")
 
-async def manual_out(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def manual_out(update: Update, context: CallbackContext):
     """Marcar salida manual"""
     user_id = update.effective_user.id
     
@@ -409,7 +409,7 @@ async def manual_out(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         await update.message.reply_text("❌ Error de conexión.")
 
-async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def handle_message(update: Update, context: CallbackContext):
     """Manejar mensajes durante la configuración"""
     user_id = update.effective_user.id
     
@@ -539,7 +539,7 @@ async def scheduled_check_out():
         except Exception as e:
             logger.error(f"Error en salida automática para usuario {user_id}: {e}")
 
-async def check_attendance_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def check_attendance_status(update: Update, context: CallbackContext):
     """Verificar si hay asistencia abierta y desde qué hora"""
     user_id = update.effective_user.id
     
@@ -582,18 +582,19 @@ async def check_attendance_status(update: Update, context: ContextTypes.DEFAULT_
 
 def main():
     """Función principal"""
-    # Crear aplicación
-    application = Application.builder().token(BOT_TOKEN).build()
+    # Crear updater y dispatcher
+    updater = Updater(BOT_TOKEN, use_context=True)
+    dispatcher = updater.dispatcher
     
     # Agregar handlers
-    application.add_handler(CommandHandler("start", start))
-    application.add_handler(CommandHandler("config", config))
-    application.add_handler(CommandHandler("status", status))
-    application.add_handler(CommandHandler("test", test_connection))
-    application.add_handler(CommandHandler("manual_in", manual_in))
-    application.add_handler(CommandHandler("manual_out", manual_out))
-    application.add_handler(CommandHandler("check_status", check_attendance_status))
-    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+    dispatcher.add_handler(CommandHandler("start", start))
+    dispatcher.add_handler(CommandHandler("config", config))
+    dispatcher.add_handler(CommandHandler("status", status))
+    dispatcher.add_handler(CommandHandler("test", test_connection))
+    dispatcher.add_handler(CommandHandler("manual_in", manual_in))
+    dispatcher.add_handler(CommandHandler("manual_out", manual_out))
+    dispatcher.add_handler(CommandHandler("check_status", check_attendance_status))
+    dispatcher.add_handler(MessageHandler(Filters.text & ~Filters.command, handle_message))
     
     # Configurar scheduler
     scheduler = AsyncIOScheduler(timezone=CUBA_TZ)
@@ -624,7 +625,9 @@ def main():
     
     # Ejecutar bot
     logger.info("Bot iniciado")
-    application.run_polling()
+    updater.start_polling()
+    updater.idle()
 
 if __name__ == '__main__':
     main()
+
