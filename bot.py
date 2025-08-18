@@ -17,7 +17,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-BOT_TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN', '8402582437:AAE0FFIRVBli09VCm5TpqTtbBvwVeOkqKmE')
+BOT_TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN')
 
 # Zona horaria de Cuba
 CUBA_TZ = pytz.timezone('America/Havana')
