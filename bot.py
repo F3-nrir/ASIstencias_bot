@@ -11,6 +11,8 @@ from handlers import (
     handle_manual_in, handle_manual_out, handle_check_status, handle_exit, handle_message
 )
 from scheduler import scheduled_check_in, scheduled_check_out
+from web_server import run_web_server
+from keep_alive import KeepAlive
 
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -24,6 +26,13 @@ CUBA_TZ = pytz.timezone('America/Havana')
 def main():
     """Función principal"""
     bot = TelegramBot(BOT_TOKEN)
+    
+    web_server_thread = threading.Thread(target=run_web_server, daemon=True)
+    web_server_thread.start()
+    logger.info("Servidor web iniciado en hilo separado")
+    
+    keep_alive = KeepAlive()
+    keep_alive.start_keep_alive()
     
     # Configurar scheduler
     scheduler = BlockingScheduler(timezone=CUBA_TZ)
