@@ -18,7 +18,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-BOT_TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN')
+BOT_TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN', '8402582437:AAE0FFIRVBli09VCm5TpqTtbBvwVeOkqKmE')
 CUBA_TZ = pytz.timezone('America/Havana')
 
 def main():
