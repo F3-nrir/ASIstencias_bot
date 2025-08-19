@@ -29,15 +29,15 @@ def clear_pending_updates(bot):
     """Limpia todos los mensajes pendientes en la cola de Telegram"""
     try:
         logger.info("Limpiando mensajes pendientes...")
-        updates = bot.get_updates(offset=-1, limit=100, timeout=1)
+        updates = bot.get_updates()
         
         if updates and updates.get('ok'):
             result = updates.get('result', [])
             if result:
                 last_update_id = result[-1]['update_id']
                 # Confirmar que se procesaron todos los mensajes
-                bot.get_updates(offset=last_update_id + 1, limit=1, timeout=1)
                 bot.offset = last_update_id + 1
+                updates = bot.get_updates()
                 logger.info(f"Limpiados {len(result)} mensajes pendientes. Nuevo offset: {bot.offset}")
             else:
                 logger.info("No hay mensajes pendientes")
@@ -107,7 +107,7 @@ def main():
     
     while True:
         try:
-            updates = bot.get_updates(timeout=30)  # Timeout más largo para reducir polling
+            updates = bot.get_updates()
             
             if updates and updates.get('ok'):
                 result = updates.get('result', [])
