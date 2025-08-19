@@ -9,8 +9,23 @@ logger = logging.getLogger(__name__)
 user_configs = {}
 user_states = {}
 
+def cleanup_old_users():
+    """Limpia usuarios antiguos si hay más de 2"""
+    if len(user_configs) > 2:
+        # Mantener solo los 2 usuarios más recientes
+        sorted_users = sorted(user_configs.items(), key=lambda x: x[0])
+        users_to_remove = sorted_users[:-2]
+        for user_id, _ in users_to_remove:
+            if user_id in user_configs:
+                del user_configs[user_id]
+            if user_id in user_states:
+                del user_states[user_id]
+        logger.info(f"Limpiados {len(users_to_remove)} usuarios antiguos")
+
 def handle_start(bot, chat_id, user_id):
     """Comando /start"""
+    cleanup_old_users()
+    
     if user_id in user_configs:
         text = (
             "¡Hola! Ya tienes configurado tu bot de asistencias.\n\n"
@@ -34,6 +49,8 @@ def handle_start(bot, chat_id, user_id):
 
 def handle_config(bot, chat_id, user_id):
     """Iniciar configuración de Odoo"""
+    cleanup_old_users()
+    
     user_states[user_id] = "waiting_url"
     text = (
         "🔧 Configuración de Odoo\n\n"
@@ -130,7 +147,8 @@ def handle_manual_out(bot, chat_id, user_id):
             text = (
                 f"✅ Salida marcada exitosamente!\n"
                 f"🕐 Hora: {now.strftime('%H:%M:%S')}\n"
-                f"📅 Fecha: {now.strftime('%d/%m/%Y')}"
+                f"📅 Fecha: {now.strftime('%d/%m/%Y')}\n"
+                f"⏱️ Tiempo trabajado: {datetime.now(cuba_tz) - now}"
             )
         else:
             text = "❌ Error al marcar salida o no hay entrada abierta."
@@ -185,10 +203,8 @@ def handle_exit(bot, chat_id, user_id):
         bot.send_message(chat_id, "❌ No tienes configuración guardada.")
         return
     
-    # Borrar configuración del usuario
     del user_configs[user_id]
     
-    # Borrar estado si existe
     if user_id in user_states:
         del user_states[user_id]
     
@@ -203,6 +219,8 @@ def handle_exit(bot, chat_id, user_id):
 
 def handle_message(bot, chat_id, user_id, text):
     """Manejar mensajes durante la configuración"""
+    cleanup_old_users()
+    
     if user_id not in user_states:
         bot.send_message(chat_id, "Usa /start para comenzar o /config para configurar.")
         return
