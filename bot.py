@@ -80,19 +80,19 @@ def main():
     
     scheduler.add_job(
         scheduled_check_in,
-        CronTrigger(hour=8, minute=0, day_of_week='mon-fri', timezone=CUBA_TZ),
+        CronTrigger(hour=12, minute=0, day_of_week='mon-fri', timezone=CUBA_TZ),
         id='check_in'
     )
     
     scheduler.add_job(
         scheduled_check_out,
-        CronTrigger(hour=17, minute=30, day_of_week='mon-thu', timezone=CUBA_TZ),
+        CronTrigger(hour=21, minute=30, day_of_week='mon-thu', timezone=CUBA_TZ),
         id='check_out_weekdays'
     )
     
     scheduler.add_job(
         scheduled_check_out,
-        CronTrigger(hour=16, minute=30, day_of_week='fri', timezone=CUBA_TZ),
+        CronTrigger(hour=20, minute=30, day_of_week='fri', timezone=CUBA_TZ),
         id='check_out_friday'
     )
     
