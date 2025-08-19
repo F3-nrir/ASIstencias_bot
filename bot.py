@@ -67,18 +67,18 @@ def main():
     
     logger.info("Bot iniciado")
     
-    processed_updates = set()
-    
     while True:
         try:
             updates = bot.get_updates()
             
             if updates and updates.get('ok'):
-                for update in updates.get('result', []):
+                result = updates.get('result', [])
+                
+                last_update_id = None
+                
+                for update in result:
                     update_id = update['update_id']
-                    
-                    if update_id in processed_updates:
-                        continue
+                    last_update_id = update_id
                     
                     if 'message' in update:
                         message = update['message']
@@ -110,12 +110,9 @@ def main():
                                     handle_message(bot, chat_id, user_id, text)
                             except Exception as e:
                                 logger.error(f"Error procesando mensaje: {e}")
-                    
-                    bot.offset = update_id + 1
-                    processed_updates.add(update_id)
-                    
-                    if len(processed_updates) > 1000:
-                        processed_updates.clear()
+                
+                if last_update_id is not None:
+                    bot.offset = last_update_id + 1
             
             time.sleep(1)
             
