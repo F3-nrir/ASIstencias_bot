@@ -23,9 +23,34 @@ logger = logging.getLogger(__name__)
 BOT_TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN')
 CUBA_TZ = pytz.timezone('America/Havana')
 
+def clear_pending_updates(bot):
+    """Limpia todos los mensajes pendientes en la cola de Telegram"""
+    try:
+        logger.info("Limpiando mensajes pendientes...")
+        # Obtener todos los updates pendientes con un offset alto
+        updates = bot.get_updates(offset=-1, limit=1)
+        
+        if updates and updates.get('ok'):
+            result = updates.get('result', [])
+            if result:
+                # Si hay mensajes, obtener el último update_id y limpiar todo
+                last_update_id = result[-1]['update_id']
+                # Confirmar que se procesaron todos los mensajes hasta ese punto
+                bot.get_updates(offset=last_update_id + 1, limit=1)
+                bot.offset = last_update_id + 1
+                logger.info(f"Mensajes pendientes limpiados. Nuevo offset: {bot.offset}")
+            else:
+                logger.info("No hay mensajes pendientes")
+        else:
+            logger.warning("No se pudieron obtener updates para limpiar")
+    except Exception as e:
+        logger.error(f"Error limpiando mensajes pendientes: {e}")
+
 def main():
     """Función principal"""
     bot = TelegramBot(BOT_TOKEN)
+    
+    clear_pending_updates(bot)
     
     web_server_thread = threading.Thread(target=run_web_server, daemon=True)
     web_server_thread.start()
