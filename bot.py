@@ -67,13 +67,18 @@ def main():
     
     logger.info("Bot iniciado")
     
+    processed_updates = set()
+    
     while True:
         try:
             updates = bot.get_updates()
             
             if updates and updates.get('ok'):
                 for update in updates.get('result', []):
-                    bot.offset = update['update_id'] + 1
+                    update_id = update['update_id']
+                    
+                    if update_id in processed_updates:
+                        continue
                     
                     if 'message' in update:
                         message = update['message']
@@ -83,25 +88,34 @@ def main():
                         if 'text' in message:
                             text = message['text']
                             
-                            # Manejar comandos
-                            if text == '/start':
-                                handle_start(bot, chat_id, user_id)
-                            elif text == '/config':
-                                handle_config(bot, chat_id, user_id)
-                            elif text == '/status':
-                                handle_status(bot, chat_id, user_id)
-                            elif text == '/test':
-                                handle_test(bot, chat_id, user_id)
-                            elif text == '/manual_in':
-                                handle_manual_in(bot, chat_id, user_id)
-                            elif text == '/manual_out':
-                                handle_manual_out(bot, chat_id, user_id)
-                            elif text == '/check_status':
-                                handle_check_status(bot, chat_id, user_id)
-                            elif text == '/exit':
-                                handle_exit(bot, chat_id, user_id)
-                            elif not text.startswith('/'):
-                                handle_message(bot, chat_id, user_id, text)
+                            try:
+                                # Manejar comandos
+                                if text == '/start':
+                                    handle_start(bot, chat_id, user_id)
+                                elif text == '/config':
+                                    handle_config(bot, chat_id, user_id)
+                                elif text == '/status':
+                                    handle_status(bot, chat_id, user_id)
+                                elif text == '/test':
+                                    handle_test(bot, chat_id, user_id)
+                                elif text == '/manual_in':
+                                    handle_manual_in(bot, chat_id, user_id)
+                                elif text == '/manual_out':
+                                    handle_manual_out(bot, chat_id, user_id)
+                                elif text == '/check_status':
+                                    handle_check_status(bot, chat_id, user_id)
+                                elif text == '/exit':
+                                    handle_exit(bot, chat_id, user_id)
+                                elif not text.startswith('/'):
+                                    handle_message(bot, chat_id, user_id, text)
+                            except Exception as e:
+                                logger.error(f"Error procesando mensaje: {e}")
+                    
+                    bot.offset = update_id + 1
+                    processed_updates.add(update_id)
+                    
+                    if len(processed_updates) > 1000:
+                        processed_updates.clear()
             
             time.sleep(1)
             
