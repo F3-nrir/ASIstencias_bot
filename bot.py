@@ -50,7 +50,7 @@ def is_user_allowed(user_id):
     """Verifica si el usuario está permitido"""
     if not ALLOWED_USERS:
         from handlers import user_configs
-        if len(user_configs) < 2:
+        if len(user_configs) < 1000:
             return True
         return user_id in user_configs
     return user_id in ALLOWED_USERS
@@ -80,7 +80,7 @@ def main():
     
     scheduler.add_job(
         scheduled_check_in,
-        CronTrigger(hour=12, minute=0, day_of_week='mon-fri', timezone=CUBA_TZ),
+        CronTrigger(hour=11, minute=58, day_of_week='mon-fri', timezone=CUBA_TZ),
         id='check_in'
     )
     
