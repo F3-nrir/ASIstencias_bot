@@ -137,3 +137,22 @@ class OdooAPI:
         except Exception as e:
             logger.error(f"Error obteniendo asistencia abierta: {e}")
             return None
+
+    def get_last_attendance(self, employee_id):
+        """Obtener la última asistencia del empleado (abierta o cerrada)"""
+        try:
+            attendances = self.models.execute_kw(self.db, self.uid, self.password,
+                                               'hr.attendance', 'search_read',
+                                               [[['employee_id', '=', employee_id]]],
+                                               {'fields': ['id', 'check_in', 'check_out'], 
+                                                'order': 'id desc', 
+                                                'limit': 1})
+            
+            if attendances:
+                return attendances[0]
+            else:
+                return None
+                
+        except Exception as e:
+            logger.error(f"Error obteniendo última asistencia: {e}")
+            return None

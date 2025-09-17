@@ -8,7 +8,8 @@ from apscheduler.triggers.cron import CronTrigger
 from telegram_bot import TelegramBot
 from handlers import (
     handle_start, handle_config, handle_status, handle_test,
-    handle_manual_in, handle_manual_out, handle_check_status, handle_exit, handle_message
+    handle_manual_in, handle_manual_out, handle_check_status, handle_exit, handle_message,
+    handle_users, handle_rm
 )
 from scheduler import scheduled_check_in, scheduled_check_out
 from web_server import run_web_server
@@ -23,7 +24,7 @@ logger = logging.getLogger(__name__)
 BOT_TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN')
 CUBA_TZ = pytz.timezone('America/Havana')
 
-ALLOWED_USERS = []  # Agregar user_ids aquí: [123456789, 987654321]
+ALLOWED_USERS = []  # Lista vacía para permitir a todos los usuarios
 
 def clear_pending_updates(bot):
     """Limpia todos los mensajes pendientes en la cola de Telegram"""
@@ -49,10 +50,7 @@ def clear_pending_updates(bot):
 def is_user_allowed(user_id):
     """Verifica si el usuario está permitido"""
     if not ALLOWED_USERS:
-        from handlers import user_configs
-        if len(user_configs) < 1000:
-            return True
-        return user_id in user_configs
+        return True  # Permitir a todos los usuarios si ALLOWED_USERS está vacío
     return user_id in ALLOWED_USERS
 
 def main():
@@ -147,6 +145,15 @@ def main():
                                     handle_check_status(bot, chat_id, user_id)
                                 elif text == '/exit':
                                     handle_exit(bot, chat_id, user_id)
+                                elif text == '/users':
+                                    handle_users(bot, chat_id, user_id)
+                                elif text.startswith('/rm'):
+                                    parts = text.split()
+                                    if len(parts) == 2:
+                                        username = parts[1]
+                                        handle_rm(bot, chat_id, user_id, username)
+                                    else:
+                                        bot.send_message(chat_id, "Uso: /rm <username>")
                                 elif not text.startswith('/'):
                                     handle_message(bot, chat_id, user_id, text)
                             except Exception as e:

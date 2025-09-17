@@ -9,23 +9,8 @@ logger = logging.getLogger(__name__)
 user_configs = {}
 user_states = {}
 
-def cleanup_old_users():
-    """Limpia usuarios antiguos si hay más de 2"""
-    if len(user_configs) > 2:
-        # Mantener solo los 2 usuarios más recientes
-        sorted_users = sorted(user_configs.items(), key=lambda x: x[0])
-        users_to_remove = sorted_users[:-2]
-        for user_id, _ in users_to_remove:
-            if user_id in user_configs:
-                del user_configs[user_id]
-            if user_id in user_states:
-                del user_states[user_id]
-        logger.info(f"Limpiados {len(users_to_remove)} usuarios antiguos")
-
 def handle_start(bot, chat_id, user_id):
     """Comando /start"""
-    cleanup_old_users()
-    
     if user_id in user_configs:
         text = (
             "¡Hola! Ya tienes configurado tu bot de asistencias.\n\n"
@@ -36,7 +21,9 @@ def handle_start(bot, chat_id, user_id):
             "/manual_in - Marcar entrada manual\n"
             "/manual_out - Marcar salida manual\n"
             "/check_status - Ver si tienes asistencia abierta\n"
-            "/exit - Borrar configuración y empezar de nuevo"
+            "/exit - Borrar configuración y empezar de nuevo\n"
+            "/users - Listar usuarios configurados\n"
+            "/rm <username> - Eliminar un usuario"
         )
     else:
         text = (
@@ -49,8 +36,6 @@ def handle_start(bot, chat_id, user_id):
 
 def handle_config(bot, chat_id, user_id):
     """Iniciar configuración de Odoo"""
-    cleanup_old_users()
-    
     user_states[user_id] = "waiting_url"
     text = (
         "🔧 Configuración de Odoo\n\n"
@@ -60,18 +45,72 @@ def handle_config(bot, chat_id, user_id):
     bot.send_message(chat_id, text)
 
 def handle_status(bot, chat_id, user_id):
-    """Ver estado de configuración"""
+    """Ver estado de configuración y estado de asistencia"""
     if user_id not in user_configs:
         bot.send_message(chat_id, "❌ No tienes configuración guardada. Usa /config para configurar.")
         return
     
     config = user_configs[user_id]
+    
+    # Obtener información de asistencia
+    attendance_status = "🔄 Verificando estado de asistencia..."
+    bot.send_message(chat_id, attendance_status)
+    
+    odoo = OdooAPI(config['url'], config['db'], config['username'], config['password'])
+    
+    if odoo.authenticate():
+        employee_id = odoo.get_employee_id()
+        if employee_id:
+            # Obtener asistencia abierta
+            open_attendance = odoo.get_open_attendance(employee_id)
+            
+            # Obtener última asistencia cerrada
+            last_attendance = odoo.get_last_attendance(employee_id)
+            
+            if open_attendance:
+                cuba_tz = pytz.timezone('America/Havana')
+                check_in_str = open_attendance['check_in']
+                check_in_utc = datetime.strptime(check_in_str, '%Y-%m-%d %H:%M:%S')
+                check_in_utc = pytz.utc.localize(check_in_utc)
+                check_in_cuba = check_in_utc.astimezone(cuba_tz)
+                
+                attendance_info = (
+                    f"📊 Estado de asistencia:\n"
+                    f"✅ Tienes una asistencia ABIERTA\n"
+                    f"🕐 Hora de entrada: {check_in_cuba.strftime('%H:%M:%S')}\n"
+                    f"📅 Fecha: {check_in_cuba.strftime('%d/%m/%Y')}\n"
+                    f"⏱️ Tiempo trabajado: {datetime.now(cuba_tz) - check_in_cuba}"
+                )
+            elif last_attendance and last_attendance.get('check_out'):
+                cuba_tz = pytz.timezone('America/Havana')
+                check_out_str = last_attendance['check_out']
+                check_out_utc = datetime.strptime(check_out_str, '%Y-%m-%d %H:%M:%S')
+                check_out_utc = pytz.utc.localize(check_out_utc)
+                check_out_cuba = check_out_utc.astimezone(cuba_tz)
+                
+                attendance_info = (
+                    f"📊 Estado de asistencia:\n"
+                    f"❌ No tienes asistencia abierta\n"
+                    f"🕐 Última salida: {check_out_cuba.strftime('%H:%M:%S')}\n"
+                    f"📅 Fecha: {check_out_cuba.strftime('%d/%m/%Y')}"
+                )
+            else:
+                attendance_info = (
+                    f"📊 Estado de asistencia:\n"
+                    f"❌ No tienes registros de asistencia"
+                )
+        else:
+            attendance_info = "❌ No se encontró empleado asociado."
+    else:
+        attendance_info = "❌ Error de conexión al verificar estado de asistencia."
+    
     text = (
         f"✅ Configuración actual:\n\n"
         f"🌐 URL: {config['url']}\n"
         f"🗄️ Base de datos: {config['db']}\n"
         f"👤 Usuario: {config['username']}\n"
         f"🔑 Contraseña: {'*' * len(config['password'])}\n\n"
+        f"{attendance_info}\n\n"
         f"⏰ Horarios programados:\n"
         f"📅 Lunes a Jueves: 8:00 AM - 5:30 PM\n"
         f"📅 Viernes: 8:00 AM - 4:30 PM"
@@ -147,8 +186,7 @@ def handle_manual_out(bot, chat_id, user_id):
             text = (
                 f"✅ Salida marcada exitosamente!\n"
                 f"🕐 Hora: {now.strftime('%H:%M:%S')}\n"
-                f"📅 Fecha: {now.strftime('%d/%m/%Y')}\n"
-                f"⏱️ Tiempo trabajado: {datetime.now(cuba_tz) - now}"
+                f"📅 Fecha: {now.strftime('%d/%m/%Y')}"
             )
         else:
             text = "❌ Error al marcar salida o no hay entrada abierta."
@@ -217,11 +255,53 @@ def handle_exit(bot, chat_id, user_id):
     
     bot.send_message(chat_id, text)
 
+def handle_users(bot, chat_id, user_id):
+    """Listar todos los usuarios configurados en el bot"""
+    if not user_configs:
+        bot.send_message(chat_id, "No hay usuarios configurados.")
+        return
+
+    users_list = "👥 Usuarios configurados:\n\n"
+    for uid, config in user_configs.items():
+        users_list += f"👤 Username: {config['username']}\n"
+        users_list += f"🌐 URL: {config['url']}\n"
+        users_list += f"🗄️ DB: {config['db']}\n"
+        users_list += f"🆔 User ID: {uid}\n"
+        users_list += "---\n"
+
+    bot.send_message(chat_id, users_list)
+
+def handle_rm(bot, chat_id, user_id, username):
+    """Eliminar un usuario por su username"""
+    # Buscar el user_id por username
+    found = False
+    for uid, config in user_configs.items():
+        if config['username'] == username:
+            # Eliminar el usuario
+            del user_configs[uid]
+            if uid in user_states:
+                del user_states[uid]
+            found = True
+            break
+
+    if found:
+        bot.send_message(chat_id, f"✅ Usuario {username} eliminado correctamente.")
+    else:
+        bot.send_message(chat_id, f"❌ No se encontró el usuario {username}.")
+
 def handle_message(bot, chat_id, user_id, text):
     """Manejar mensajes durante la configuración"""
-    cleanup_old_users()
-    
     if user_id not in user_states:
+        # Verificar si es un comando /rm
+        if text.startswith('/rm'):
+            parts = text.split()
+            if len(parts) == 2:
+                username = parts[1]
+                handle_rm(bot, chat_id, user_id, username)
+            else:
+                bot.send_message(chat_id, "Uso: /rm <username>")
+            return
+
         bot.send_message(chat_id, "Usa /start para comenzar o /config para configurar.")
         return
     
@@ -273,7 +353,9 @@ def handle_message(bot, chat_id, user_id, text):
                     "/manual_out - Marcar salida\n"
                     "/status - Ver configuración\n"
                     "/test - Probar conexión\n"
-                    "/exit - Borrar configuración y empezar de nuevo"
+                    "/exit - Borrar configuración y empezar de nuevo\n"
+                    "/users - Listar usuarios configurados\n"
+                    "/rm <username> - Eliminar un usuario"
                 )
             else:
                 text = (
