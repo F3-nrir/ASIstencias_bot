@@ -9,7 +9,7 @@ from telegram_bot import TelegramBot
 from handlers import (
     handle_start, handle_config, handle_status, handle_test,
     handle_manual_in, handle_manual_out, handle_check_status, handle_exit, handle_message,
-    handle_users, handle_rm
+    handle_users, handle_rm, load_persistent_data
 )
 from scheduler import scheduled_check_in, scheduled_check_out
 from web_server import run_web_server
@@ -57,14 +57,16 @@ def main():
     """Función principal"""
     bot = TelegramBot(BOT_TOKEN)
     
+    # Cargar datos persistentes al inicio
+    load_persistent_data()
+    logger.info("Datos persistentes cargados al inicio")
+    
     clear_pending_updates(bot)
     time.sleep(2)  # Esperar un poco antes de continuar
     clear_pending_updates(bot)  # Segunda limpieza para asegurar
     
     from handlers import user_configs, user_states
-    user_configs.clear()
-    user_states.clear()
-    logger.info("Datos de usuarios limpiados al inicio")
+    logger.info(f"Usuarios configurados al inicio: {len(user_configs)}")
     
     web_server_thread = threading.Thread(target=run_web_server, daemon=True)
     web_server_thread.start()

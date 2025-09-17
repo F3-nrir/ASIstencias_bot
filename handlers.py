@@ -1,13 +1,49 @@
 import logging
+import json
+import os
 import pytz
 from datetime import datetime
 from odoo_api import OdooAPI
 
 logger = logging.getLogger(__name__)
 
+# Archivo para persistencia
+PERSISTENCE_FILE = "user_data.json"
+
 # Almacenamiento temporal de configuraciones de usuario
 user_configs = {}
 user_states = {}
+
+# Cargar datos persistentes
+def load_persistent_data():
+    global user_configs, user_states
+    try:
+        if os.path.exists(PERSISTENCE_FILE):
+            with open(PERSISTENCE_FILE, 'r') as f:
+                data = json.load(f)
+                user_configs = data.get('user_configs', {})
+                user_states = data.get('user_states', {})
+                logger.info("Datos persistentes cargados correctamente")
+    except Exception as e:
+        logger.error(f"Error cargando datos persistentes: {e}")
+        user_configs = {}
+        user_states = {}
+
+# Guardar datos persistentes
+def save_persistent_data():
+    try:
+        data = {
+            'user_configs': user_configs,
+            'user_states': user_states
+        }
+        with open(PERSISTENCE_FILE, 'w') as f:
+            json.dump(data, f)
+        logger.info("Datos persistentes guardados correctamente")
+    except Exception as e:
+        logger.error(f"Error guardando datos persistentes: {e}")
+
+# Cargar datos al importar el módulo
+load_persistent_data()
 
 def handle_start(bot, chat_id, user_id):
     """Comando /start"""
@@ -37,6 +73,8 @@ def handle_start(bot, chat_id, user_id):
 def handle_config(bot, chat_id, user_id):
     """Iniciar configuración de Odoo"""
     user_states[user_id] = "waiting_url"
+    save_persistent_data()  # Guardar estado inmediatamente
+    
     text = (
         "🔧 Configuración de Odoo\n\n"
         "Por favor, envía la URL de tu servidor Odoo:\n"
@@ -246,6 +284,8 @@ def handle_exit(bot, chat_id, user_id):
     if user_id in user_states:
         del user_states[user_id]
     
+    save_persistent_data()  # Guardar cambios
+    
     text = (
         "🗑️ Configuración eliminada exitosamente.\n\n"
         "✅ Tus tareas programadas han sido detenidas.\n"
@@ -285,23 +325,25 @@ def handle_rm(bot, chat_id, user_id, username):
             break
 
     if found:
+        save_persistent_data()  # Guardar cambios
         bot.send_message(chat_id, f"✅ Usuario {username} eliminado correctamente.")
     else:
         bot.send_message(chat_id, f"❌ No se encontró el usuario {username}.")
 
 def handle_message(bot, chat_id, user_id, text):
     """Manejar mensajes durante la configuración"""
+    # Verificar si es un comando /rm primero
+    if text.startswith('/rm'):
+        parts = text.split()
+        if len(parts) == 2:
+            username = parts[1]
+            handle_rm(bot, chat_id, user_id, username)
+        else:
+            bot.send_message(chat_id, "Uso: /rm <username>")
+        return
+    
+    # Si no está en estado de configuración, mostrar mensaje inicial
     if user_id not in user_states:
-        # Verificar si es un comando /rm
-        if text.startswith('/rm'):
-            parts = text.split()
-            if len(parts) == 2:
-                username = parts[1]
-                handle_rm(bot, chat_id, user_id, username)
-            else:
-                bot.send_message(chat_id, "Uso: /rm <username>")
-            return
-
         bot.send_message(chat_id, "Usa /start para comenzar o /config para configurar.")
         return
     
@@ -316,24 +358,28 @@ def handle_message(bot, chat_id, user_id, text):
             user_configs[user_id] = {}
         user_configs[user_id]['url'] = text.rstrip('/')
         user_states[user_id] = "waiting_db"
+        save_persistent_data()  # Guardar estado
         
         bot.send_message(chat_id, "✅ URL guardada.\n\nAhora envía el nombre de tu base de datos:")
     
     elif state == "waiting_db":
         user_configs[user_id]['db'] = text
         user_states[user_id] = "waiting_username"
+        save_persistent_data()  # Guardar estado
         
         bot.send_message(chat_id, "✅ Base de datos guardada.\n\nAhora envía tu nombre de usuario de Odoo:")
     
     elif state == "waiting_username":
         user_configs[user_id]['username'] = text
         user_states[user_id] = "waiting_password"
+        save_persistent_data()  # Guardar estado
         
         bot.send_message(chat_id, "✅ Usuario guardado.\n\nPor último, envía tu contraseña de Odoo:")
     
     elif state == "waiting_password":
         user_configs[user_id]['password'] = text
         del user_states[user_id]
+        save_persistent_data()  # Guardar estado
         
         bot.send_message(chat_id, "✅ ¡Configuración completada!\n\nProbando conexión...")
         
@@ -365,5 +411,6 @@ def handle_message(bot, chat_id, user_id, text):
         else:
             text = "❌ Error de conexión. Verifica tus credenciales y usa /config para reconfigurar."
             del user_configs[user_id]
+            save_persistent_data()  # Guardar cambios
         
         bot.send_message(chat_id, text)
